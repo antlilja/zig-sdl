@@ -11,20 +11,26 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    const t = lib.target_info.target;
+    const t = target.result;
 
     lib.addIncludePath(sdl_dep.path("include"));
     lib.defineCMacro("SDL_USE_BUILTIN_OPENGL_DEFINITIONS", "1");
     lib.linkLibC();
 
-    for(generic_src_files) |file| {
-        lib.addCSourceFile(.{ .file =  sdl_dep.path(file), .flags = &.{},});
+    for (generic_src_files) |file| {
+        lib.addCSourceFile(.{
+            .file = sdl_dep.path(file),
+            .flags = &.{},
+        });
     }
 
     switch (t.os.tag) {
         .windows => {
-            for(windows_src_files) |file| {
-                lib.addCSourceFile(.{ .file =  sdl_dep.path(file), .flags = &.{},});
+            for (windows_src_files) |file| {
+                lib.addCSourceFile(.{
+                    .file = sdl_dep.path(file),
+                    .flags = &.{},
+                });
             }
             lib.linkSystemLibrary("setupapi");
             lib.linkSystemLibrary("winmm");
@@ -35,11 +41,17 @@ pub fn build(b: *std.Build) void {
             lib.linkSystemLibrary("ole32");
         },
         .macos => {
-            for(darwin_src_files) |file| {
-                lib.addCSourceFile(.{ .file =  sdl_dep.path(file), .flags = &.{},});
+            for (darwin_src_files) |file| {
+                lib.addCSourceFile(.{
+                    .file = sdl_dep.path(file),
+                    .flags = &.{},
+                });
             }
-            for(objective_c_src_files) |file| {
-                lib.addCSourceFile(.{ .file =  sdl_dep.path(file), .flags = &.{},});
+            for (objective_c_src_files) |file| {
+                lib.addCSourceFile(.{
+                    .file = sdl_dep.path(file),
+                    .flags = &.{},
+                });
             }
             lib.linkFramework("OpenGL");
             lib.linkFramework("Metal");
@@ -55,19 +67,37 @@ pub fn build(b: *std.Build) void {
         },
         else => {
             const config_header = b.addConfigHeader(.{
-                .style = .{ .cmake =  sdl_dep.path("include/SDL_config.h.cmake") },
+                .style = .{ .cmake = sdl_dep.path("include/SDL_config.h.cmake") },
                 .include_path = "SDL2/SDL_config.h",
             }, .{});
             lib.addConfigHeader(config_header);
             lib.installConfigHeader(config_header, .{});
         },
     }
-    lib.installHeadersDirectoryOptions( .{
-        .source_dir =  sdl_dep.path("include"), 
+    lib.installHeadersDirectoryOptions(.{
+        .source_dir = sdl_dep.path("include"),
         .install_dir = .header,
         .install_subdir = "SDL2",
     });
     b.installArtifact(lib);
+
+    const exe = b.addExecutable(.{
+        .name = "dgi-lab1",
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    b.installArtifact(exe);
+    exe.linkLibrary(lib);
+
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(b.getInstallStep());
+    if (b.args) |args| {
+        run_cmd.addArgs(args);
+    }
+
+    const run_step = b.step("run", "Run the app");
+    run_step.dependOn(&run_cmd.step);
 }
 
 const generic_src_files = [_][]const u8{
